@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/Navbar';
@@ -7,23 +7,40 @@ import Sidebar from '@/components/Sidebar';
 import VideoCard from '@/components/VideoCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Edit, Settings, Share2 } from 'lucide-react';
-import { videos } from '@/lib/data';
+import { Edit, Settings, Share2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { VideoService } from '@/services/VideoService';
+import { Video } from '@/lib/data';
+import UploadDialog from '@/components/UploadDialog';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userVideos, setUserVideos] = useState<Video[]>([]);
+  const [likedVideos, setLikedVideos] = useState<Video[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const navigate = useNavigate();
-  
-  // Mock data - in a real app, these would come from an API
-  const userVideos = videos.slice(0, 3); // First 3 videos as mock user videos
-  const likedVideos = videos.slice(3, 6); // Next 3 videos as mock liked videos
-  const playlistVideos = videos.slice(6, 9); // Next 3 videos as mock playlist videos
   
   const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
+  
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      setIsLoading(true);
+      
+      // Load user's videos
+      const videos = VideoService.getUserVideos(user.id);
+      setUserVideos(videos);
+      
+      // Load liked videos
+      const liked = VideoService.getLikedVideos(user.id);
+      setLikedVideos(liked);
+      
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, user]);
   
   // Redirect to home if not authenticated
   if (!isAuthenticated || !user) {
@@ -38,6 +55,12 @@ const Profile: React.FC = () => {
       .join('')
       .toUpperCase()
       .substring(0, 2);
+  };
+
+  const handleUploadSuccess = () => {
+    // Refresh user videos after a successful upload
+    const videos = VideoService.getUserVideos(user.id);
+    setUserVideos(videos);
   };
 
   return (
@@ -60,10 +83,21 @@ const Profile: React.FC = () => {
             <div className="flex-1">
               <h1 className="text-2xl font-bold">{user.name}'s Channel</h1>
               <p className="text-muted-foreground">@{user.name.toLowerCase().replace(' ', '')}</p>
-              <p className="text-sm mt-1">120 subscribers • 24 videos</p>
+              <p className="text-sm mt-1">
+                {userVideos.length} {userVideos.length === 1 ? 'video' : 'videos'}
+              </p>
             </div>
             
             <div className="flex gap-2 mt-4 sm:mt-0">
+              <Button 
+                variant="default"
+                size="sm" 
+                className="flex items-center gap-2"
+                onClick={() => setIsUploadDialogOpen(true)}
+              >
+                <Upload size={16} />
+                <span>Upload Video</span>
+              </Button>
               <Button variant="outline" size="sm" className="flex items-center gap-2">
                 <Edit size={16} />
                 <span>Edit Channel</span>
@@ -91,45 +125,60 @@ const Profile: React.FC = () => {
           
           <TabsContent value="videos" className="space-y-6">
             <h2 className="text-xl font-medium mb-4">Uploaded Videos</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {userVideos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-              {userVideos.length === 0 && (
-                <div className="col-span-full text-center py-12">
-                  <p className="text-muted-foreground">No videos uploaded yet</p>
-                  <Button className="mt-4">Upload a Video</Button>
-                </div>
-              )}
-            </div>
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="aspect-video bg-muted rounded-lg animate-pulse"></div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {userVideos.map((video) => (
+                  <VideoCard key={video.id} video={video} />
+                ))}
+                {userVideos.length === 0 && (
+                  <div className="col-span-full text-center py-12">
+                    <p className="text-muted-foreground">No videos uploaded yet</p>
+                    <Button className="mt-4" onClick={() => setIsUploadDialogOpen(true)}>
+                      Upload a Video
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="playlists" className="space-y-6">
             <h2 className="text-xl font-medium mb-4">Your Playlists</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {playlistVideos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-              {playlistVideos.length === 0 && (
-                <div className="col-span-full text-center py-12">
-                  <p className="text-muted-foreground">No playlists created yet</p>
-                </div>
-              )}
+              {/* Playlists will be implemented in a future update */}
+              <div className="col-span-full text-center py-12">
+                <p className="text-muted-foreground">No playlists created yet</p>
+                <Button className="mt-4">Create a Playlist</Button>
+              </div>
             </div>
           </TabsContent>
           
           <TabsContent value="liked" className="space-y-6">
             <h2 className="text-xl font-medium mb-4">Liked Videos</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {likedVideos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-              {likedVideos.length === 0 && (
-                <div className="col-span-full text-center py-12">
-                  <p className="text-muted-foreground">No liked videos yet</p>
-                </div>
-              )}
-            </div>
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="aspect-video bg-muted rounded-lg animate-pulse"></div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {likedVideos.map((video) => (
+                  <VideoCard key={video.id} video={video} />
+                ))}
+                {likedVideos.length === 0 && (
+                  <div className="col-span-full text-center py-12">
+                    <p className="text-muted-foreground">No liked videos yet</p>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="about" className="max-w-3xl mx-auto">
@@ -145,24 +194,20 @@ const Profile: React.FC = () => {
               <div>
                 <h3 className="font-medium mb-2">Details</h3>
                 <div className="space-y-1 text-sm">
-                  <p>Joined: January 2023</p>
-                  <p>Total views: 24,853</p>
-                  <p>Location: New York, USA</p>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">Links</h3>
-                <div className="space-y-1 text-sm">
-                  <a href="#" className="text-primary hover:underline block">Website</a>
-                  <a href="#" className="text-primary hover:underline block">Twitter</a>
-                  <a href="#" className="text-primary hover:underline block">Instagram</a>
+                  <p>Joined: {new Date().toLocaleDateString()}</p>
+                  <p>Total views: {userVideos.reduce((total, video) => total + parseInt(video.views.replace(/[^\d]/g, '') || '0'), 0)}</p>
                 </div>
               </div>
             </div>
           </TabsContent>
         </Tabs>
       </main>
+      
+      <UploadDialog 
+        isOpen={isUploadDialogOpen} 
+        onClose={() => setIsUploadDialogOpen(false)}
+        onSuccess={handleUploadSuccess}
+      />
     </div>
   );
 };

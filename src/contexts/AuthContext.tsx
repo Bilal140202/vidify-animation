@@ -1,6 +1,7 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+// Create a type for the user
 interface User {
   id: string;
   name: string;
@@ -8,76 +9,69 @@ interface User {
   avatar: string;
 }
 
+// Create a type for the context
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => void;
-  register: (name: string, email: string, password: string) => void;
+  isAuthDialogOpen: boolean;
+  login: (user: User) => void;
   logout: () => void;
+  openAuthDialog: () => void;
+  closeAuthDialog: () => void;
 }
 
-const initialUser: User | null = null;
+// Create the context
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AuthContext = createContext<AuthContextType>({
-  user: initialUser,
-  isAuthenticated: false,
-  login: () => {},
-  register: () => {},
-  logout: () => {},
-});
+// Create a provider component
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
 
-export const useAuth = () => useContext(AuthContext);
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-
-  // Check for existing user in localStorage on component mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem('vidify_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
-    }
-  }, []);
-
-  const login = (email: string, password: string) => {
-    // This is a mock implementation - would use actual auth in production
-    const mockUser = {
-      id: '1',
-      name: 'Demo User',
-      email,
-      avatar: `https://picsum.photos/id/${Math.floor(Math.random() * 100)}/40/40`,
-    };
-    
-    setUser(mockUser);
-    setIsAuthenticated(true);
-    localStorage.setItem('vidify_user', JSON.stringify(mockUser));
-  };
-
-  const register = (name: string, email: string, password: string) => {
-    // This is a mock implementation - would use actual auth in production
-    const newUser = {
-      id: '1',
-      name,
-      email,
-      avatar: `https://picsum.photos/id/${Math.floor(Math.random() * 100)}/40/40`,
-    };
-    
-    setUser(newUser);
-    setIsAuthenticated(true);
-    localStorage.setItem('vidify_user', JSON.stringify(newUser));
+  const login = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setIsAuthDialogOpen(false);
   };
 
   const logout = () => {
     setUser(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem('vidify_user');
+    localStorage.removeItem('user');
+  };
+
+  const openAuthDialog = () => {
+    setIsAuthDialogOpen(true);
+  };
+
+  const closeAuthDialog = () => {
+    setIsAuthDialogOpen(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isAuthDialogOpen,
+        login,
+        logout,
+        openAuthDialog,
+        closeAuthDialog,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
+};
+
+// Create a hook to use the auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
