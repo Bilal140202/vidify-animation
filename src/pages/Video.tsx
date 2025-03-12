@@ -1,8 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ThumbsUp, ThumbsDown, Share2, Download, PlusCircle, ChevronLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import Sidebar from '@/components/Sidebar';
 import VideoPlayer from '@/components/VideoPlayer';
 import VideoCard from '@/components/VideoCard';
 import { videos } from '@/lib/data';
@@ -10,9 +11,14 @@ import { videos } from '@/lib/data';
 const Video: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const video = videos.find(v => v.id === id);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Related videos (exclude current video)
   const relatedVideos = videos.filter(v => v.id !== id).slice(0, 5);
+  
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
   
   useEffect(() => {
     // Scroll to top when video page is loaded
@@ -32,7 +38,8 @@ const Video: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar onMenuClick={toggleSidebar} />
+      <Sidebar isOpen={isSidebarOpen} />
       
       <main className="container mx-auto pt-20 px-4">
         <div className="lg:flex lg:gap-6">
